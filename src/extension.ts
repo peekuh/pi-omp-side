@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import { parseSideArguments } from "./arguments.ts";
 import { Herdr, herdrExec } from "./herdr.ts";
 import { childArgs, runtimeCommand, shellQuote, validatePrompt, writeLaunchFile } from "./launch.ts";
 import type { LaunchFile } from "./launch.ts";
@@ -28,10 +29,10 @@ export async function runSide(api: SideAPI, host: Host, args: string, ctx: SideC
     if (ctx.mode !== "tui") throw new Error("/side requires interactive mode.");
     if (env.HERDR_ENV !== "1" || !env.HERDR_PANE_ID) throw new Error("/side must run inside a Herdr-managed pane.");
     if (process.platform === "win32") throw new Error("/side currently requires a POSIX shell (Linux, macOS, or WSL).");
-    const prompt = args.trim();
+    const { prompt, name } = parseSideArguments(args);
     validatePrompt(prompt);
     // Capture everything before yielding: the parent may keep streaming or switch sessions.
-    const snapshot = captureSnapshot(ctx.sessionManager, ctx.cwd, host, prompt);
+    const snapshot = captureSnapshot(ctx.sessionManager, ctx.cwd, host, prompt, name);
     const tools = [...api.getActiveTools()];
     const model = ctx.model ? { ...ctx.model } : undefined;
     const thinking = api.getThinkingLevel();
@@ -70,7 +71,7 @@ export async function runSide(api: SideAPI, host: Host, args: string, ctx: SideC
 
 export function registerSide(api: SideAPI, host: Host): void {
   api.registerCommand("side", {
-    description: "Fork this conversation into a background Herdr pane: /side [prompt]",
+    description: 'Fork into a background Herdr pane: /side [--name "Task label"] [prompt]',
     handler: (args, ctx) => runSide(api, host, args, ctx),
   });
 }

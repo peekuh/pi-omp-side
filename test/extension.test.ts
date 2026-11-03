@@ -71,6 +71,36 @@ for (const host of ["pi", "omp"] as Host[]) {
   });
 }
 
+for (const host of ["pi", "omp"] as Host[]) {
+  for (const prompt of ['Inspect @file /reload --print "literally"\nSecond line.', ""]) {
+    test(`${host}: --name labels a ${prompt ? "prompted" : "idle"} fork without forwarding the option`, async t => {
+      const fixture = await setup(t);
+      const output = join(fixture.dir, "child-args.json");
+      fixture.dependencies.command = [process.execPath, "-e", `require("node:fs").writeFileSync(${JSON.stringify(output)}, JSON.stringify(process.argv.slice(1)))`, "--"];
+      await runSide(fixture.api, host, `--name "Webhook audit" ${prompt}`, fixture.ctx, fixture.dependencies);
+      const childFile = (await readdir(fixture.dir)).find(file => file.endsWith(".jsonl") && file !== "parent.jsonl")!;
+      const entries = (await readFile(join(fixture.dir, childFile), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+      const title = host === "pi" ? entries.at(-1).name : entries[0].title;
+      assert.equal(title, "Side: Webhook audit");
+      if (host === "omp") assert.equal(entries.at(-1).title, title);
+      await exec("sh", ["-c", fixture.calls.find(call => call[1] === "run")![3]]);
+      const argv = JSON.parse(await readFile(output, "utf8")) as string[];
+      assert.ok(!argv.includes("--name"));
+      assert.ok(!argv.includes("Webhook audit"));
+      if (prompt) assert.equal(argv.at(-1), `Side task:\n\n${prompt}`);
+      else assert.ok(!argv.some(arg => arg.startsWith("Side task:")));
+    });
+  }
+}
+
+test("invalid --name arguments fail before creating a fork or contacting Herdr", async t => {
+  const fixture = await setup(t);
+  await runSide(fixture.api, "pi", '--name "" task', fixture.ctx, fixture.dependencies);
+  assert.equal(fixture.calls.length, 0);
+  assert.deepEqual(await readdir(fixture.dir), ["parent.jsonl"]);
+  assert.match(fixture.notices[0], /name cannot be empty/);
+});
+
 test("captures the branch before asynchronous Herdr calls", async t => {
   const fixture = await setup(t);
   const original = fixture.dependencies.herdr.caller.bind(fixture.dependencies.herdr);

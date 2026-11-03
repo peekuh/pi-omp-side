@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { cp, mkdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { validateName } from "./arguments.ts";
 import type { Host, SessionEntry, SessionHeader, SessionReader } from "./types.ts";
 
 interface Message {
@@ -49,7 +50,7 @@ export interface Snapshot {
 }
 
 /** Synchronous capture is essential: the parent can continue appending after this. */
-export function captureSnapshot(reader: SessionReader, cwd: string, host: Host, prompt: string): Snapshot {
+export function captureSnapshot(reader: SessionReader, cwd: string, host: Host, prompt: string, name?: string): Snapshot {
   const sourceFile = reader.getSessionFile();
   const sourceHeader = reader.getHeader();
   if (!sourceFile || !sourceHeader) throw new Error("/side needs a persisted session (not --no-session).");
@@ -57,7 +58,7 @@ export function captureSnapshot(reader: SessionReader, cwd: string, host: Host, 
   const completed = completedBranch(branch);
   const now = new Date().toISOString();
   const id = randomUUID();
-  const title = `Side: ${prompt.replace(/\s+/g, " ").slice(0, 80) || "conversation"}`;
+  const title = `Side: ${name === undefined ? prompt.replace(/\s+/g, " ").slice(0, 80) || "conversation" : validateName(name)}`;
   const header: SessionHeader = {
     ...JSON.parse(JSON.stringify(sourceHeader)),
     type: "session",
