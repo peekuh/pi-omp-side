@@ -28,8 +28,8 @@ pane whenever you want to continue that conversation.
 - The delegated prompt and output are **not** inserted into the parent's conversation.
   The command only shows a local UI notification. There is no automatic merge.
 
-Unlike `pi-herdr-side`, this extension does **not** reuse the parent's native session
-ID for cache affinity. Cache reuse is provider-dependent and is not guaranteed.
+Each fork has its own native session ID; the parent's ID is not reused for cache
+affinity. Cache reuse is provider-dependent and is not guaranteed.
 
 ## Requirements
 
