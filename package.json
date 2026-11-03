@@ -1,0 +1,26 @@
+{
+  "name": "pi-omp-side",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fork Pi or OMP into a background Herdr pane with /side <prompt>.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "install:local": "node scripts/install.ts"
+  },
+  "pi": {
+    "extensions": [
+      "./pi.ts"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2"
+  }
+}
