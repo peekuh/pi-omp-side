@@ -31,6 +31,13 @@ test("targets caller context, uses returned IDs, and never focuses the child", a
   assert.ok(calls.every(args => !args.includes("--focus") && args[1] !== "focus"));
 });
 
+test("pane labels target only the returned child and remain a literal argument", async () => {
+  const { exec, calls } = fakeExec();
+  const title = 'Pi setup ↳ $(touch /tmp/nope) "Audit" · a31f';
+  await new Herdr(exec).rename("w1:p99", title);
+  assert.deepEqual(calls, [["pane", "rename", "w1:p99", title]]);
+});
+
 test("splits narrow panes down instead of making unusably narrow columns", async () => {
   const { exec } = fakeExec(60, 40);
   assert.equal(await new Herdr(exec).direction("w1:p8"), "down");

@@ -26,6 +26,7 @@ async function setup(t: { after(fn: () => Promise<void>): void }, failure?: stri
     sessionManager: {
       getSessionFile: () => parentFile,
       getSessionDir: () => dir,
+      getSessionName: () => "Pi setup",
       getHeader: () => ({ type: "session", version: 3, id: "parent-id", cwd: dir }),
       getBranch: () => branch,
     },
@@ -81,7 +82,8 @@ for (const host of ["pi", "omp"] as Host[]) {
       const childFile = (await readdir(fixture.dir)).find(file => file.endsWith(".jsonl") && file !== "parent.jsonl")!;
       const entries = (await readFile(join(fixture.dir, childFile), "utf8")).trim().split("\n").map(line => JSON.parse(line));
       const title = host === "pi" ? entries.at(-1).name : entries[0].title;
-      assert.equal(title, "Side: Webhook audit");
+      assert.equal(title, `Pi setup ↳ Webhook audit · ${entries[0].id.slice(0, 4)}`);
+      assert.deepEqual(fixture.calls.find(call => call[1] === "rename"), ["pane", "rename", "w1:p2", title]);
       if (host === "omp") assert.equal(entries.at(-1).title, title);
       await exec("sh", ["-c", fixture.calls.find(call => call[1] === "run")![3]]);
       const argv = JSON.parse(await readFile(output, "utf8")) as string[];
@@ -106,11 +108,13 @@ test("captures the branch before asynchronous Herdr calls", async t => {
   const original = fixture.dependencies.herdr.caller.bind(fixture.dependencies.herdr);
   fixture.dependencies.herdr.caller = async () => {
     fixture.branch[0].message.content = "changed while awaiting Herdr";
+    fixture.ctx.sessionManager.getSessionName = () => "Changed parent";
     return original();
   };
   await runSide(fixture.api, "pi", "task", fixture.ctx, fixture.dependencies);
   const child = (await readdir(fixture.dir)).find(file => file.endsWith(".jsonl") && file !== "parent.jsonl")!;
   assert.ok((await readFile(join(fixture.dir, child), "utf8")).includes("existing conversation"));
+  assert.match(fixture.calls.find(call => call[1] === "rename")![3], /^Pi setup ↳ task · /);
   await exec("sh", ["-c", fixture.calls.find(call => call[1] === "run")![3]]);
 });
 
@@ -120,6 +124,15 @@ test("cleans up only its own pane and fork when startup fails before submission"
   assert.deepEqual(await readdir(fixture.dir), ["parent.jsonl"]);
   assert.deepEqual(fixture.calls.at(-1), ["pane", "close", "w1:p2"]);
   assert.ok(fixture.notices.some(notice => notice.includes("failed process-info")));
+});
+
+test("a pane-label failure warns but still launches the named fork", async t => {
+  const fixture = await setup(t, "rename");
+  await runSide(fixture.api, "pi", '--name "Audit" task', fixture.ctx, fixture.dependencies);
+  assert.ok(fixture.notices.some(notice => notice.includes("Could not label pane w1:p2")));
+  assert.ok(fixture.notices.some(notice => notice.includes("Focus stays here")));
+  assert.ok(!fixture.calls.some(call => call[1] === "close"));
+  await exec("sh", ["-c", fixture.calls.find(call => call[1] === "run")![3]]);
 });
 
 test("ambiguous submission failures keep the child instead of duplicating or killing work", async t => {

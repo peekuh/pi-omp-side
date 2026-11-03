@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { cp, mkdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { validateName } from "./arguments.ts";
+import { sideTitle } from "./naming.ts";
 import type { Host, SessionEntry, SessionHeader, SessionReader } from "./types.ts";
 
 interface Message {
@@ -40,6 +40,7 @@ export function completedBranch(entries: readonly SessionEntry[]): {
 }
 
 export interface Snapshot {
+  title: string;
   header: SessionHeader;
   entries: SessionEntry[];
   sourceFile: string;
@@ -58,7 +59,10 @@ export function captureSnapshot(reader: SessionReader, cwd: string, host: Host, 
   const completed = completedBranch(branch);
   const now = new Date().toISOString();
   const id = randomUUID();
-  const title = `Side: ${name === undefined ? prompt.replace(/\s+/g, " ").slice(0, 80) || "conversation" : validateName(name)}`;
+  const title = sideTitle({
+    parentName: reader.getSessionName?.() ?? (typeof sourceHeader.title === "string" ? sourceHeader.title : undefined),
+    cwd, prompt, id, name,
+  });
   const header: SessionHeader = {
     ...JSON.parse(JSON.stringify(sourceHeader)),
     type: "session",
@@ -83,6 +87,7 @@ export function captureSnapshot(reader: SessionReader, cwd: string, host: Host, 
     ...(host === "pi" ? { name: title } : { title, source: "user", trigger: "side" }),
   });
   return {
+    title,
     header,
     entries,
     sourceFile,

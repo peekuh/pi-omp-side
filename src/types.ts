@@ -21,6 +21,7 @@ export interface SessionReader {
   getSessionFile(): string | undefined;
   getSessionDir(): string;
   getBranch(): SessionEntry[];
+  getSessionName?(): string | undefined;
   getArtifactsDir?(): string | null;
 }
 

@@ -34,6 +34,11 @@ for (const host of ["pi", "omp"] as const) {
     assert.notEqual(snapshot.header.id, "parent");
     assert.equal(snapshot.header.providerPromptCacheKey, undefined);
     assert.equal(snapshot.header.parentSession, join(dir, "parent.jsonl"));
+    assert.match(snapshot.title, / ↳ investigate · [0-9a-f]{4}$/);
+    assert.equal(snapshot.title.endsWith(snapshot.header.id.slice(0, 4)), true);
+    const titleEntry = snapshot.entries.at(-1)!;
+    assert.equal(host === "pi" ? titleEntry.name : titleEntry.title, snapshot.title);
+    if (host === "omp") assert.equal(snapshot.header.title, snapshot.title);
     assert.deepEqual(snapshot.header.additionalDirectories, ["/extra"]);
     assert.equal(JSON.stringify(branch), parent);
     branch[1].message = { role: "user", content: "changed after capture" };
@@ -49,6 +54,15 @@ for (const host of ["pi", "omp"] as const) {
     assert.notEqual(second.header.id, snapshot.header.id);
   });
 }
+
+test("OMP header titles provide a fallback when the reader has no naming method", () => {
+  const { reader } = fixture("/tmp/project");
+  const getHeader = reader.getHeader;
+  reader.getHeader = () => ({ ...getHeader()!, title: "Payments" });
+  assert.match(captureSnapshot(reader, "/tmp/project", "omp", "", "Webhook audit").title, /^Payments ↳ Webhook audit · /);
+  reader.getSessionName = () => "Renamed payments";
+  assert.match(captureSnapshot(reader, "/tmp/project", "omp", "", "Webhook audit").title, /^Renamed payments ↳ Webhook audit · /);
+});
 
 test("omits an unfinished parallel tool batch, including already completed siblings", () => {
   const { branch } = fixture("/tmp");

@@ -77,6 +77,10 @@ export class Herdr {
     throw new Error(`New pane ${pane} did not reach an available shell prompt.`);
   }
 
+  async rename(pane: string, title: string): Promise<void> {
+    await this.request(["pane", "rename", pane, title]);
+  }
+
   async run(pane: string, command: string): Promise<void> {
     await this.request(["pane", "run", pane, command]);
   }

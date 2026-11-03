@@ -46,10 +46,12 @@ export async function runSide(api: SideAPI, host: Host, args: string, ctx: SideC
     launch = await writeLaunchFile(command, argsForChild, env);
     pane = await herdr.split(caller, direction, cwd);
     await herdr.waitForShell(pane);
+    try { await herdr.rename(pane, snapshot.title); }
+    catch { notify(ctx, `Could not label pane ${pane}; the child session is still named ${snapshot.title}.`, "warning"); }
     // A timeout here is ambiguous: never retry or kill a possibly running child.
     submissionAttempted = true;
     await herdr.run(pane, `sh ${shellQuote(launch.file)}`);
-    notify(ctx, `Started ${host} side session in ${pane}. Focus stays here. Session: ${snapshot.header.id}`);
+    notify(ctx, `Started ${host} side session “${snapshot.title}” in ${pane}. Focus stays here. Session: ${snapshot.header.id}`);
     if (snapshot.omitted) notify(ctx, "The fork excludes the parent's unfinished tool step or streaming response.", "warning");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

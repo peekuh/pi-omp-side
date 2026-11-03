@@ -49,7 +49,7 @@ for (const host of hosts) {
     await writeFile(parentFile, parentContent, { mode: 0o600 });
     const context: SideContext = {
       mode: "tui", hasUI: true, cwd: process.cwd(), model, ui: { notify: message => console.log(host, message) },
-      sessionManager: { getHeader: () => header, getSessionFile: () => parentFile, getSessionDir: () => directory, getBranch: () => branch },
+      sessionManager: { getHeader: () => header, getSessionFile: () => parentFile, getSessionDir: () => directory, getBranch: () => branch, getSessionName: () => "Side smoke" },
     };
     const api: SideAPI = { registerCommand: () => {}, getActiveTools: () => [], getThinkingLevel: () => undefined };
     const hostExecutable = await binary(host);
@@ -60,7 +60,7 @@ for (const host of hosts) {
       if (args[1] === "split" && result.code === 0) pane = (resultOf(result.stdout).pane as { pane_id: string }).pane_id;
       return result;
     });
-    await runSide(api, host, prompt, context, { command: [runtime, await realpath(hostExecutable)], herdr });
+    await runSide(api, host, `--name "Named fork" ${prompt}`, context, { command: [runtime, await realpath(hostExecutable)], herdr });
     assert.ok(pane, "child pane was created");
     let detected = false;
     const childName = (await readdir(directory)).find(name => name.endsWith(".jsonl") && name !== "parent.jsonl")!;
@@ -86,9 +86,17 @@ for (const host of hosts) {
     }
     if (!detected) console.error((await exec(["pane", "read", pane, "--source", "recent-unwrapped", "--lines", "20"])).stdout);
     assert.ok(detected, `${host} reaches its interactive idle state`);
+    const childEntries = (await readFile(join(directory, childName), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+    const expectedTitle = `Side smoke ↳ Named fork · ${childEntries[0].id.slice(0, 4)}`;
+    const titleEntry = childEntries.findLast(entry => entry.type === (host === "pi" ? "session_info" : "title_change"));
+    assert.equal(host === "pi" ? titleEntry?.name : titleEntry?.title, expectedTitle, "child retains its explicit session name");
+    const paneResult = await exec(["pane", "get", pane]);
+    assert.equal(paneResult.code, 0);
+    const paneInfo = resultOf(paneResult.stdout).pane as Record<string, unknown>;
+    assert.ok(Object.values(paneInfo).includes(expectedTitle), "Herdr pane has the matching label");
     assert.equal(await focus(), focusedBefore, "keyboard focus did not move");
     assert.equal(await readFile(parentFile, "utf8"), parentContent, "parent file remains unchanged");
-    console.log(`${host}: PASS — real child ${prompt ? "answered the delegated prompt" : "is idle"}; parent file and focus unchanged.`);
+    console.log(`${host}: PASS — real child ${prompt ? "answered the delegated prompt" : "is idle"}; session and pane names match; parent file and focus unchanged.`);
   } finally {
     if (pane) await exec(["pane", "close", pane]);
     await rm(directory, { recursive: true, force: true });
