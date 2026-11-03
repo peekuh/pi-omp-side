@@ -15,6 +15,8 @@ pane whenever you want to continue that conversation.
 
 - **`/side <prompt>`** forks the current branch and runs the prompt in a sibling pane.
 - **`/side`** opens the fork with an empty editor, without making a model request.
+- **`/side --name "Task label" [prompt]`** gives the fork an explicit task label.
+  Without a prompt, it opens a named idle fork.
 - Every child gets a **new native session ID** and its own persisted session file.
   The session header records the original file as `parentSession`.
 - The original session is not aborted, switched, or made to wait for a model turn.
@@ -30,6 +32,45 @@ pane whenever you want to continue that conversation.
 
 Each fork has its own native session ID; the parent's ID is not reused for cache
 affinity. Cache reuse is provider-dependent and is not guaranteed.
+
+## Naming forks
+
+Use `--name` before the prompt to choose a short task label:
+
+```text
+/side --name "Webhook audit" Investigate whether webhook processing is idempotent. Don't change files.
+/side --name "Test coverage"
+```
+
+Both the native Pi/OMP session and the Herdr pane receive the same title:
+
+```text
+Payments refactor ↳ Webhook audit · a31f
+```
+
+The format is **parent name ↳ task label · first four characters of the child's UUID**.
+The parent keeps its original name and ID; the child still owns a new full UUID.
+
+- Without `--name`, the first prompt line becomes the label (up to 80 characters).
+- Bare `/side` uses `Explore` as the label.
+- An unnamed parent falls back to the working directory's name.
+- A fork of a fork uses its immediate parent's task label, avoiding an ever-growing
+  title: `Webhook audit ↳ Retry tests · b72e`.
+- Parent labels are shortened to 60 characters. Explicit task labels must be
+  non-empty, at most 80 Unicode code points, and contain no control characters.
+- Single/double quotes, backslash escapes, and `--name="Task label"` are supported.
+  Names are parsed locally, never evaluated as shell commands or sent as task text.
+- Options must precede the prompt. Use `--` to start a literal prompt that begins
+  with `--name`, for example `/side -- --name is an option I want you to explain`.
+  After the prompt starts, its quotes, newlines, and option-like text stay literal.
+
+Pane labeling is best-effort: if Herdr cannot rename the new pane, a warning is
+shown and the child still launches with its native session name. The launch
+notification includes the full title, pane ID, and native session ID.
+
+After updating this checkout, run `/reload` in an already-open agent to load the
+new command code. New agent processes load it automatically. Existing forks keep
+their names; they are not renamed retroactively.
 
 ## Requirements
 
@@ -121,12 +162,14 @@ bun test test
 ```
 
 The automated tests cover unique IDs, immutable snapshots, partial tool batches,
-artifact copies, literal shell argument handling, environment separation,
-no-focus pane creation, failure cleanup, and safe installation.
+artifact copies, name/option parsing, session and pane labels, literal shell
+argument handling, environment separation, no-focus pane creation, failure cleanup,
+and safe installation.
 
 Optional live smoke test, **run inside Herdr**: creates two sibling panes, launches
-real idle Pi/OMP children, checks focus and parent-file preservation, then closes
-only its own panes. It makes no model requests by default.
+real named idle Pi/OMP children, checks matching session/pane labels, focus, and
+parent-file preservation, then closes only its own panes. It makes no model
+requests by default.
 
 ```bash
 node /absolute/path/to/pi-omp-side/scripts/smoke-live.ts
@@ -149,6 +192,8 @@ can make the prompt check take several minutes.
 ```text
 pi.ts / omp.ts        Small host adapters
 src/extension.ts     Local slash-command orchestration
+src/arguments.ts     Leading --name parsing; untouched literal prompt
+src/naming.ts        Bounded parent/task/short-ID display titles
 src/snapshot.ts      Branch capture and independent session persistence
 src/herdr.ts         Explicit-caller, no-focus pane control
 src/launch.ts        Safe native-host arguments and private one-shot launcher
