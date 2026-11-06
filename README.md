@@ -1,4 +1,4 @@
-# pi-omp-side
+# pi-side
 
 Fork a tangent into another [Herdr](https://herdr.dev) pane from **Pi or OMP**, without
 moving keyboard focus or putting the tangent in the parent's model context.
